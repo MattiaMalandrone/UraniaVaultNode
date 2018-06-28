@@ -1,4 +1,5 @@
 {
   "jwtPrivateKey": "uv_jwtPrivateKey",
-  "name": "uv_name"
+  "name": "uv_name",
+  "db": "uv_db"
 }

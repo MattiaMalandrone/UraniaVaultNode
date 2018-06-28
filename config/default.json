@@ -1,5 +1,5 @@
 {
     "name": "Urania Vault App",
     "jwtPrivateKey": "",
-    "db": "mongodb://localhost/uraniaVault"
+    "db": ""
 }
