@@ -2,7 +2,7 @@ const config = require('config');
 const mongoose = require('mongoose');
 
 const relationSchema = new mongoose.Schema({
-    alboId:  mongoose.Schema.ObjectId,
+    alboId: mongoose.Schema.ObjectId,
     userId: mongoose.Schema.ObjectId,
     status: String
 });
