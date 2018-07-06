@@ -4,7 +4,15 @@ const { User } = require('../models/user');
 const { Relation } = require('../models/relation');
 const mongoose = require('mongoose');
 const express = require('express');
+const cloudinary = require('cloudinary');
+const cheerio = require('cheerio')
 const router = express.Router();
+
+cloudinary.config({
+    cloud_name: 'hxhune77r',
+    api_key: '363153635214738',
+    api_secret: 'v8Qnt9oaACok0qK27iNqedHBv0o'
+});
 
 router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
 
@@ -12,7 +20,14 @@ router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
 
     const countAlbiLoaded = parseInt(req.params.countAlbiLoaded);
 
-    let filter = parseInt(req.params.filter);
+    let filter = req.params.filter;
+
+    if(filter == 'null')
+        filter = '';
+
+    console.log('filter:');
+    console.log(filter);
+    console.log('-----------------------------------');
 
     /**
      * When a $sort immediately precedes a $limit in the pipeline,
@@ -23,10 +38,29 @@ router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
     const albi = await Albo.aggregate([
         {
             $match: {
-                numero : {
-                    // $gt:  countAlbiLoaded
-                    $eq: filter
-                }
+                // numero : {
+                //     // $gt:  countAlbiLoaded
+                //     $eq: filter
+                // }
+                // title: {
+                //     $regex: filter,
+                //     $options: 'xi'
+                // }
+
+                $or: [
+                    {
+                        title: {
+                            $regex: filter,
+                            $options: 'xi'
+                        }
+                    },
+                    {
+                        numero : {
+                            // $gt:  countAlbiLoaded
+                            $eq: filter
+                        }
+                    }
+                ]
             }
         },
         {   $lookup: { from: "relations", localField: "_id", foreignField: "alboId", as: "status" } },
@@ -65,13 +99,28 @@ router.get('/albo/:email/:numero', async (req, res) => {
             $project: {
                 numero: 1,
                 title: 1,
-                status: { $filter: { input: "$status", as: "rel", cond: { $eq: [ "$$rel.userId", user._id ] } } }
+                autore: 1,
+                urlCover: 1,
+                status: {
+                    $filter: {
+                        input: "$status",
+                        as: "rel",
+                        cond: {
+                            $eq: [ "$$rel.userId", user._id ]
+                        }
+                    }
+                }
             },
         },
         // { "$unwind": "$status" } // usare questo, però prima devo creare un init sulla relation per auopoppolarla
     ]);
 
-    console.log(albo);
+    const htmlImg = cloudinary.image(`UraniaVault/u${albo[0].numero}.jpg`);
+    const url = cheerio.load(htmlImg)('img').attr('src');
+    albo[0].urlCover = url;
+
+    albo[0].status = albo[0].status[0].status === 'NaN' ? '0' : albo[0].status[0].status;
+
     console.log(albo[0]);
 
     res.send(albo[0]);
@@ -82,10 +131,6 @@ router.put('/albo/:email/:idAlbo/:stato', async (req, res) => {
 
     const user = await User.findOne({ email: req.params.email });
 
-    console.log(req.params.email);
-    console.log(req.params.idAlbo);
-    console.log(req.params.stato);
-
     const alboIdObejct = mongoose.Types.ObjectId(req.params.idAlbo);
 
     const relation = await Relation.findOne({ userId: user._id, alboId: alboIdObejct });
@@ -94,7 +139,7 @@ router.put('/albo/:email/:idAlbo/:stato', async (req, res) => {
 
     relation.save();
 
-    res.send();
+    res.send({ stato : relation.status });
 });
 
 router.post('/init', async (req, res) => {
