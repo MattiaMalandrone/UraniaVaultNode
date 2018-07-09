@@ -14,11 +14,11 @@ cloudinary.config({
     api_secret: 'v8Qnt9oaACok0qK27iNqedHBv0o'
 });
 
-router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
+router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
 
     const user = await User.findOne({ email: req.params.email });
 
-    const countAlbiLoaded = parseInt(req.params.countAlbiLoaded);
+    const lastAlboNumero = req.params.lastAlboNumero;
 
     let filter = req.params.filter;
 
@@ -28,6 +28,62 @@ router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
     console.log('filter:');
     console.log(filter);
     console.log('-----------------------------------');
+    console.log(`lastAlboNumero: ${lastAlboNumero}`);
+
+    let matcher = {};
+
+    if(lastAlboNumero == 0) {
+        matcher = {
+            $or: [
+                {
+                    title: {
+                        $regex: filter,
+                        $options: 'xi'
+                    }
+                },
+                {
+                    numero : {
+                        $eq: filter
+                    }
+                }
+            ]
+        };
+    } else {
+        matcher = {
+            numero : {
+                $gt:  parseInt(lastAlboNumero)
+            }
+            // $or: [
+            //     {
+            //         $and: [
+            //             {
+            //                 title: {
+            //                     $regex: filter,
+            //                     $options: 'xi'
+            //                 },
+            //                 numero : {
+            //                     $gt:  lastAlboNumero
+            //                 }
+            //             }
+            //         ]
+            //     },
+            //     {
+            //         $and: [
+            //             {
+            //                 numero : {
+            //                     $eq: filter
+            //                 },
+            //                 numero : {
+            //                     $gt:  lastAlboNumero
+            //                 }
+            //             }
+            //         ]
+            //     }
+            // ]
+        }
+    }
+
+    console.log(matcher);
 
     /**
      * When a $sort immediately precedes a $limit in the pipeline,
@@ -36,38 +92,12 @@ router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
      * This optimization still applies when allowDiskUse is true and the n items exceed the aggregation memory limit.
      */
     const albi = await Albo.aggregate([
+        { $match: matcher },
+        { $lookup: { from: "relations", localField: "_id", foreignField: "alboId", as: "status" } },
+        { $sort : { numero : 1 }  },
+        { $limit: 10  },
         {
-            $match: {
-                // numero : {
-                //     // $gt:  countAlbiLoaded
-                //     $eq: filter
-                // }
-                // title: {
-                //     $regex: filter,
-                //     $options: 'xi'
-                // }
-
-                $or: [
-                    {
-                        title: {
-                            $regex: filter,
-                            $options: 'xi'
-                        }
-                    },
-                    {
-                        numero : {
-                            // $gt:  countAlbiLoaded
-                            $eq: filter
-                        }
-                    }
-                ]
-            }
-        },
-        {   $lookup: { from: "relations", localField: "_id", foreignField: "alboId", as: "status" } },
-        {   $sort : { numero : 1 }  },
-        {   $limit: 10  },
-        {
-            $project: {
+          $project: {
                 numero: 1,
                 title: 1,
                 status: { $filter: { input: "$status", as: "rel", cond: { $eq: [ "$$rel.userId", user._id ] } } }
@@ -75,6 +105,8 @@ router.get('/list/:email/:countAlbiLoaded/:filter', async (req, res) => {
         },
         // { "$unwind": "$status" } // usare questo, però prima devo creare un init sulla relation per auopoppolarla
     ]);
+
+    console.log(albi);
 
     res.send(albi);
 });
@@ -112,14 +144,16 @@ router.get('/albo/:email/:numero', async (req, res) => {
                 }
             },
         },
-        // { "$unwind": "$status" } // usare questo, però prima devo creare un init sulla relation per auopoppolarla
+        { "$unwind": "$status" }
     ]);
+
+    console.log(albo);
 
     const htmlImg = cloudinary.image(`UraniaVault/u${albo[0].numero}.jpg`);
     const url = cheerio.load(htmlImg)('img').attr('src');
     albo[0].urlCover = url;
 
-    albo[0].status = albo[0].status[0].status === 'NaN' ? '0' : albo[0].status[0].status;
+    albo[0].status = albo[0].status.status === 'NaN' ? '0' : albo[0].status.status;
 
     console.log(albo[0]);
 
