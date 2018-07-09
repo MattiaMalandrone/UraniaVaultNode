@@ -103,7 +103,7 @@ router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
                 status: { $filter: { input: "$status", as: "rel", cond: { $eq: [ "$$rel.userId", user._id ] } } }
             },
         },
-        // { "$unwind": "$status" } // usare questo, però prima devo creare un init sulla relation per auopoppolarla
+        { "$unwind": "$status" } // usare questo, però prima devo creare un init sulla relation per auopoppolarla
     ]);
 
     console.log(albi);
