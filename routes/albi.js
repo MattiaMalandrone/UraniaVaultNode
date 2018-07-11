@@ -14,6 +14,9 @@ cloudinary.config({
     api_secret: 'v8Qnt9oaACok0qK27iNqedHBv0o'
 });
 
+/**
+ * GetAlbi
+ */
 router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
 
     const user = await User.findOne({ email: req.params.email });
@@ -25,65 +28,17 @@ router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
     if(filter == 'null')
         filter = '';
 
-    console.log('filter:');
-    console.log(filter);
-    console.log('-----------------------------------');
-    console.log(`lastAlboNumero: ${lastAlboNumero}`);
-
     let matcher = {};
 
     if(lastAlboNumero == 0) {
         matcher = {
             $or: [
-                {
-                    title: {
-                        $regex: filter,
-                        $options: 'xi'
-                    }
-                },
-                {
-                    numero : {
-                        $eq: filter
-                    }
-                }
-            ]
+                    { title: { $regex: filter, $options: 'xi' } },
+                    { numero : { $eq: filter } }
+                 ]
         };
-    } else {
-        matcher = {
-            numero : {
-                $gt:  parseInt(lastAlboNumero)
-            }
-            // $or: [
-            //     {
-            //         $and: [
-            //             {
-            //                 title: {
-            //                     $regex: filter,
-            //                     $options: 'xi'
-            //                 },
-            //                 numero : {
-            //                     $gt:  lastAlboNumero
-            //                 }
-            //             }
-            //         ]
-            //     },
-            //     {
-            //         $and: [
-            //             {
-            //                 numero : {
-            //                     $eq: filter
-            //                 },
-            //                 numero : {
-            //                     $gt:  lastAlboNumero
-            //                 }
-            //             }
-            //         ]
-            //     }
-            // ]
-        }
-    }
-
-    console.log(matcher);
+    } else
+        matcher = { numero : { $gt:  parseInt(lastAlboNumero) } }
 
     /**
      * When a $sort immediately precedes a $limit in the pipeline,
@@ -100,17 +55,28 @@ router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
           $project: {
                 numero: 1,
                 title: 1,
-                status: { $filter: { input: "$status", as: "rel", cond: { $eq: [ "$$rel.userId", user._id ] } } }
+                status: {
+                    $filter: {
+                        input: "$status",
+                        as: "rel",
+                        cond: {
+                            $eq: [ "$$rel.userId", user._id ]
+                        }
+                    }
+                },
+                stato: "$status.status"
             },
         },
-        { "$unwind": "$status" } // usare questo, però prima devo creare un init sulla relation per auopoppolarla
+        { "$unwind": "$status" },
+        { "$unwind": "$stato" }
     ]);
-
-    console.log(albi);
-
+    console.log(albi[1]);
     res.send(albi);
 });
 
+/**
+ * GetAlbo
+ */
 router.get('/albo/:email/:numero', async (req, res) => {
     if (!req.params.email)
         return res.status(400).send(error.details[0].message);
@@ -141,13 +107,13 @@ router.get('/albo/:email/:numero', async (req, res) => {
                             $eq: [ "$$rel.userId", user._id ]
                         }
                     }
-                }
+                },
+                stato: "$status.status"
             },
         },
-        { "$unwind": "$status" }
+        { "$unwind": "$status" },
+        // { "$unwind": "$stato" }
     ]);
-
-    console.log(albo);
 
     const htmlImg = cloudinary.image(`UraniaVault/u${albo[0].numero}.jpg`);
     const url = cheerio.load(htmlImg)('img').attr('src');
@@ -160,6 +126,9 @@ router.get('/albo/:email/:numero', async (req, res) => {
     res.send(albo[0]);
 });
 
+/**
+ * Aggiorna Albo
+ */
 router.put('/albo/:email/:idAlbo/:stato', async (req, res) => {
     console.log('inside patch albo');
 
@@ -176,6 +145,9 @@ router.put('/albo/:email/:idAlbo/:stato', async (req, res) => {
     res.send({ stato : relation.status });
 });
 
+/**
+ * Inizializza Catalogo Cliente
+ */
 router.post('/init', async (req, res) => {
 
     if (!req.body.email)
@@ -201,15 +173,15 @@ router.post('/init', async (req, res) => {
     res.send();
 });
 
+/**
+ * Update Catalogo Cliente
+ */
 router.post('/update', async (req, res) => {
     if (!req.body.email)
       return res.status(400).send(error.details[0].message);
 
     const ultimoAlboCatalogo = await Albo.findOne({}).sort('-numero');
     const ultimoAlboUserExists = await Relation.count({ alboId: ultimoAlboCatalogo._id }) > 0;
-
-    console.log(ultimoAlboCatalogo);
-    console.log(ultimoAlboUserExists);
 
     if(ultimoAlboUserExists)
         return res.send();
@@ -219,12 +191,18 @@ router.post('/update', async (req, res) => {
     return res.send();
 });
 
+/**
+ * Controllo Primo Accesso Cliente
+ */
 router.get('/isFirstAccess/:email', async (req, res) => {
     let user = await User.findOne({ email: req.params.email });
     const count = await Relation.count({userId : user._id});
     return res.send({count: count});
 });
 
+/**
+ * Cancella Collezione Cliente
+ */
 router.delete('/deleteCollectionAlbi', async (req, res) => {
     await Relation.remove();
     return res.send();
