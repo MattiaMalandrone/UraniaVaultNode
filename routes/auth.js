@@ -32,9 +32,9 @@ router.post('/signin', async (req, res) => {
 
   const token = user.generateAuthToken();
 
-  console.log(token);
-
-  res.send({token: token});
+  console.log("token: ", token);
+  console.log("userId: ", user._id);
+  res.send({token: token, userId: user._id});
 });
 
 function validate(req) {

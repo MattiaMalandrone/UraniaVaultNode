@@ -23,6 +23,8 @@ router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
 
     const lastAlboNumero = req.params.lastAlboNumero;
 
+    console.log('lastAlboNumero: ', lastAlboNumero);
+
     let filter = req.params.filter;
 
     if(filter == 'null')
@@ -30,15 +32,19 @@ router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
 
     let matcher = {};
 
+    console.log('###########################');
+    console.log('filter: ', filter);
+    console.log('###########################');
+
     if(lastAlboNumero == 0) {
         matcher = {
             $or: [
                     { title: { $regex: filter, $options: 'xi' } },
-                    { numero : { $eq: filter } }
+                    { numero : { $eq: parseInt(filter) } }
                  ]
         };
     } else
-        matcher = { numero : { $gt:  parseInt(lastAlboNumero) } }
+        matcher = { numero : { $gt: parseInt(lastAlboNumero) } }
 
     /**
      * When a $sort immediately precedes a $limit in the pipeline,
@@ -70,7 +76,9 @@ router.get('/list/:email/:lastAlboNumero/:filter', async (req, res) => {
         { "$unwind": "$status" },
         { "$unwind": "$stato" }
     ]);
-    console.log(albi[1]);
+    console.log('-------------------------');
+    console.log('albi length: ', albi.length);
+    console.log('-------------------------');
     res.send(albi);
 });
 
